@@ -213,6 +213,7 @@ def game_info_response(data, address):
         logger.debug('Confirmed game ID {0} hosted by {1}'.format(
             active_games[key]['game_id'], key))
 
+        game_info_request(1, key)
         return True
 
     # If the opcode for this game was 3, this is a full game info response
@@ -306,11 +307,14 @@ def version_deny(address):
     # the output. If not, set the version to unknown so we use just game info
     # lite requests.
     if game_data['netgame_proto'] in SUPPORTED_NETGAME_PROTO_VERSIONS or my_proto_is_redux(game_data['netgame_proto']):
+        prev_proto = active_games[key]['netgame_proto']
         active_games[key]['netgame_proto'] = game_data['netgame_proto']
         logger.debug('Netgame protocol for game ID {0} host by {1} '
              'set to {2}'.format(active_games[key]['game_id'],
                                    key,
                                    active_games[key]['netgame_proto']))
+        if not prev_proto:
+            game_info_request(1, key)
     else:
         active_games[key]['netgame_proto'] = 'unknown'
         logger.debug('Unknown Netgame protocol for game ID {0} host by {1}'.
@@ -613,6 +617,7 @@ if old_game_data:
     for i in active_games:
         active_games[i]['socket'] = allocate_socket()
 
+last_games_to_write = [None]
 while True:
     socket_list = [listen_socket, d1x_socket, d2x_socket]
 
@@ -622,7 +627,7 @@ while True:
         if active_games[i]['socket'] not in socket_list:
             socket_list.append(active_games[i]['socket'])
 
-    readable, writeable, exception = select.select(socket_list, [], [], 1)
+    readable, writeable, exception = select.select(socket_list, [], [], 1 if active_games or last_games_to_write or stale_games else None)
 
     if readable:
         for i in readable:
@@ -746,45 +751,49 @@ while True:
                 if i not in stale_games:
                     stale_games.append(i)
 
-        # Write out the active_games dict so the web interface can render it
-        filename = 'gamelist.txt'
-        games_to_write = {}
+    # Write out the active_games dict so the web interface can render it
+    filename = 'gamelist.txt'
+    games_to_write = {}
 
-        # Only write out games that are confirmed
-        for i in active_games:
-            if active_games[i]['confirmed']:
-                games_to_write[i] = {}
-                games_to_write[i].update(active_games[i])
+    # Only write out games that are confirmed
+    for i in active_games:
+        if active_games[i]['confirmed']:
+            games_to_write[i] = {}
+            games_to_write[i].update(active_games[i])
 
-                # Drop the socket data so we can json dump this data later
-                del games_to_write[i]['socket']
+            # Drop the socket data so we can json dump this data later
+            del games_to_write[i]['socket']
+            del games_to_write[i]['pending_info_reqs']
 
+    #print("writing cur %d last %d", 1 if games_to_write else 0, 1 if last_games_to_write else 0)
+    if games_to_write != last_games_to_write:
+        last_games_to_write = games_to_write
         if my_write_file(json.dumps(games_to_write), filename):
             logger.debug('Wrote out active_games: \n{0}'.format(active_games))
         else:
             logger.debug('Error writing out active games')
 
-        # Re-query external IP addresses every 5 minutes in case it changes
-        # since the last time we started
-        if (time.time() - last_address_lookup_time >= 300):
-            if args.ext_ip:
-                external_ip = my_gethostbyname(args.ext_ip)
-                if external_ip:
-                    logger.info('External IP {0} will be used when hosting '
-                                'internal games to external '
-                                'players'.format(external_ip))
-                else:
-                    logger.error('Unable to resolve hostname, will '
-                                 'try again later')
+    # Re-query external IP addresses every 5 minutes in case it changes
+    # since the last time we started
+    if (time.time() - last_address_lookup_time >= 300):
+        if args.ext_ip:
+            external_ip = my_gethostbyname(args.ext_ip)
+            if external_ip:
+                logger.info('External IP {0} will be used when hosting '
+                            'internal games to external '
+                            'players'.format(external_ip))
+            else:
+                logger.error('Unable to resolve hostname, will '
+                             'try again later')
 
-            if args.peer_hostname:
-                peer_address = my_gethostbyname(args.peer_hostname)
-                if peer_address:
-                    peer_address = (peer_address, args.peer_port)
-                    logger.info('Peer tracker address at {0} will be queried '
-                                'for games'.format(peer_address))
-                else:
-                    logger.error('Unable to resolve hostname of peer tracker, '
-                                 'will try again later')
+        if args.peer_hostname:
+            peer_address = my_gethostbyname(args.peer_hostname)
+            if peer_address:
+                peer_address = (peer_address, args.peer_port)
+                logger.info('Peer tracker address at {0} will be queried '
+                            'for games'.format(peer_address))
+            else:
+                logger.error('Unable to resolve hostname of peer tracker, '
+                             'will try again later')
 
-            last_address_lookup_time = time.time()
+        last_address_lookup_time = time.time()

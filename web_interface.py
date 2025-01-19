@@ -12,6 +12,8 @@ import select
 import socket
 import struct
 import time
+import inotify.adapters
+import itertools
 
 
 def ping_tracker(address):
@@ -927,7 +929,23 @@ last_alt_tracker_ping = 0
 last_list_response_time = 0
 archived_count = 0
 
+inot = inotify.adapters.Inotify()
+
+inot.add_watch('.')
+
+inotiter = itertools.chain([False], inot.event_gen(yield_nones=True))
 while True:
+    event = next(inotiter)
+    if event is None:
+        continue
+    if event and (('IN_MODIFY' not in event[1]) or event[3] != 'gamelist.txt'):
+        continue
+    #print('draining for', repr(event))
+    while next(inotiter, None):
+        pass
+    #print('done')
+    #print(repr(event))
+    time.sleep(0.1)
     game_data = my_load_file('gamelist.txt')
     temp_html_output = ''
     game_count = 0
@@ -1050,4 +1068,4 @@ while True:
 
         archived_count = len(archived_games)
 
-    time.sleep(5)
+    #time.sleep(5)
