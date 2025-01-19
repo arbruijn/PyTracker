@@ -825,10 +825,10 @@ def build_html_footer(mode):
                       '<tr><td><hr></td></tr>' \
                       '<tr><td><font size=2>To use this tracker:<br>On Windows, ' \
                       'configure \'<b>' \
-                      '<i>-tracker_hostaddr retro-tracker.game-server.cc</b>' \
+                      '<i>-tracker_hostaddr {1}</b>' \
                       '</i>\' in d1x.ini' \
                       '<br>On Mac OS X, configure \'<b><i>-tracker_hostaddr ' \
-                      'retro-tracker.game-server.cc</b></i>\' in /Users/your_user_name' \
+                      '{1}</b></i>\' in /Users/your_user_name' \
                       '/Library/Preferences/D1X Rebirth/d1x.ini' \
                       '<br><br>Games monitored by this tracker are ' \
                       'archived ' \
@@ -838,7 +838,7 @@ def build_html_footer(mode):
                       '<br>Hosting provided by PuDLeZ. Discord: PuDLeZ&#35;9992<br>' \
                       '<br>Missions can be found on <a href="https://sectorgame.com/dxma/">DXMA</a><br>' \
                       '<br><a href="https://twitter.com/dxxretro">Do you like tweets?</a><br>' \
-'</td></tr>'.format(TRACKER_URL)
+'</td></tr>'.format(TRACKER_URL, TRACKER_URL[TRACKER_URL.find('://') + 3:])
 
         if ping_tracker(('127.0.0.1', 42420)):
             html_output += '<tr>' \
@@ -911,7 +911,7 @@ if args.twitter:
 else:
     twitter =  False
 
-TRACKER_URL = 'http://retro-tracker.game-server.cc'
+TRACKER_URL = 'http://retro-tracker.2ar.nl'
 ITEM_LIST = ('Laser Upgrade', 'Quad Lasers', 'Vulcan Cannon', 'Vulcan Ammo',
              'Spreadfire Cannon', 'Plasma Cannon', 'Fusion Cannon',
              'Homing Missiles', 'Proximity Bombs', 'Smart Missiles',
